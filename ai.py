@@ -1,22 +1,4 @@
 import os
-from dotenv import load_dotenv
-from google import genai
-
-load_dotenv()
-
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
-
-SYSTEM_PROMPT = """
-Sən UNEC Library AI Assistant-san.
-
-Sənin vəzifən:
-- UNEC tələbələrinə kömək etmək.
-- Kitab tövsiyələri vermək.
-- Elmi mənbələr haqqında məlumat vermək.
-- Məqalə və tədqiqat üçün istiqamət göstərmək.
-- Kitabxana xidmətlərini izah etməkimport os
 import requests
 import urllib.parse
 from bs4 import BeautifulSoup
@@ -29,69 +11,93 @@ client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
 
-def scrape_unec_library(book_name):
+def get_corrected_search_term(user_query):
     """
-    UNEC Elektron Kitabxana saytından (library.unec.edu.az) canlı axtarış edir
-    və tapılan nəticələrin xam mətnini süni intellektə ötürür.
+    Mərhələ 1: İstifadəçinin yazdığı hərf səhvlərini və ya uzun cümlələri düzəldir,
+    UNEC saytının başa düşəcəyi ən ideal 1-2 təmiz açar sözü çıxarır.
     """
     try:
-        # Kitab adını internet linkinə uyğun formata salırıq
-        encoded_query = urllib.parse.quote(book_name)
+        prompt = f"""
+        Sən bir süni intellekt filtrisən. İstifadəçi UNEC kitabxanasından kitab axtarır. 
+        Onun yazdığı mətndə hərf səhvləri, bütöv cümlələr və ya lazımsız sözlər ola bilər.
+        Sənin tək vəzifən bu mətndən sırf kitabın ən doğru, rəsmi və dəqiq adını (və ya müəllifini) çıxarmaq və hərf səhvlərini düzəltməkdir.
+        UNEC axtarış sisteminə (library.unec.edu.az) veriləcək ən ideal 1-2 açar sözü qaytar.
+
+        Nümunələr:
+        - "mənə maliyye sahəsində kitab ver" -> "Maliyyə"
+        - "malyye" -> "Maliyyə"
+        - "iqtisadın prinsipləri mənkyu" -> "İqtisadiyyatın prinsipləri"
+        - "eynshteyn nisbiliyin" -> "Eynşteyn"
+        - "makroiqtisad" -> "Makroiqtisadiyyat"
+        - "menecment düyməsi" -> "Menecment"
+
+        İstifadəçinin yazdığı mətn: "{user_query}"
         
-        # UNEC Kitabxanasının standart axtarış linki strukturunu hədəf alırıq
+        Cavab olaraq YALNIZ düzəldilmiş təmiz axtarış sözünü qaytar. Heç bir əlavə izah, nöqtə, cümlə və ya emoci yazma!
+        """
+        response = client.models.generate_content(
+            model="models/gemini-3.5-flash",
+            contents=prompt,
+        )
+        return response.text.strip()
+    except Exception:
+        return user_query  # Xəta olarsa orijinal mətni saxla
+
+def scrape_unec_library(book_name):
+    """
+    Mərhələ 2: Gemini tərəfindən düzəldilmiş dəqiq sözlə UNEC saytından canlı axtarış edir.
+    """
+    try:
+        encoded_query = urllib.parse.quote(book_name)
         search_url = f"http://library.unec.edu.az/search?q={encoded_query}"
         
-        # Saytın bizi bot kimi bloklamaması üçün özümüzü insan kimi təqdim edirik
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         
-        # Sayta canlı sorğu göndəririk (Maksimum 10 saniyə gözləyirik)
         response = requests.get(search_url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Saytdakı lazımsız dizayn, menyu və reklam kodlarını təmizləyirik
             for element in soup(["script", "style", "nav", "footer", "header"]):
                 element.decompose()
                 
-            # Səhifədə qalan təmiz mətnləri götürürük
             raw_text = soup.get_text(separator="\n")
             clean_lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
             final_text = "\n".join(clean_lines)
             
-            # Süni intellektə çox böyük yük getməməsi üçün ilk 6000 simvolu kəsirik
             return final_text[:6000]
         else:
-            return f"UNEC Kitabxana saytı cavab vermədi (Status kodu: {response.status_code})"
+            return "empty"
             
-    except Exception as e:
-        # Əgər sayt tamamilə çökübsə və ya internet kəsilibsə bu xəta qayıdır
-        return f"Canlı axtarış sistemində müvəqqəti texniki fasilə: {str(e)}"
+    except Exception:
+        return "empty"
 
 def ask_gemini(question):
-    # İstifadəçinin yazdığı mətni (kitab adını) rəsmi sayt daxilində canlı axtarırıq
-    live_site_data = scrape_unec_library(question)
+    # Öncə istifadəçinin səhvini düzəldirik (Mərhələ 1)
+    corrected_term = get_corrected_search_term(question)
+    print(f"Orijinal: {question} -> Düzəldilmiş: {corrected_term}") # Render loqlarında izləmək üçün
+    
+    # Düzəldilmiş sözlə saytda canlı axtarış edirik (Mərhələ 2)
+    live_site_data = scrape_unec_library(corrected_term)
 
     SYSTEM_PROMPT = f"""
 Sən UNEC Library AI Assistant-san. UNEC tələbələrinə və rəhbərliyinə kitab tapmaqda kömək edirsən.
 
-Sənin qərar verməyin üçün UNEC Elektron Kitabxana saytından (library.unec.edu.az) gələn CANLI AXtARIŞ NƏTİCƏLƏRİ aşağıdadır:
+Biz istifadəçinin yazdığı mətni düzəldib "{corrected_term}" olaraq UNEC Elektron Kitabxanasında canlı axtardıq. Saytdan gələn CANLI NƏTİCƏLƏR:
 ---
 {live_site_data}
 ---
 
-Qaydalar və Vəzifən:
-1. Yuxarıda verilən canlı sayt məlumatını diqqətlə analiz et. Əgər istifadəçinin axtardığı kitab (və ya ona yaxın nəticə) bu mətndə VARSA, kitabın adını, müəllifini, hansı korpusda/filialda olduğunu və əgər qeyd edilibsə RƏF, SIRA və OTAQ nömrəsini daxildən tapıb tələbəyə çox səliqəli, qalın şriftlərlə və emojilərlə təqdim et. Sayt linkini də qeyd edə bilərsən.
-2. Əgər yuxarıdakı mətndə heç bir kitab tapılmayıbsa və ya "Sayt cavab vermədi" kimi xətalar varsa, öz daxili intellektindən istifadə edərək tələbəyə həmin mövzuda oxuna biləcək 2-3 əla kitab tövsiyə et. Lakin bu zaman yerini bilmədiyin üçün əsla rəf nömrəsi uydurma! Nəzakətlə bu cümləni yaz:
-   "📍 Qeyd: Bu kitab üzrə elektron kataloqda canlı axtarış etdim, lakin dəqiq rəf nömrəsini təsdiqləmək üçün kitabxana daxilindəki fiziki terminallara yaxınlaşmağınız və ya uneclibrary saytından birbaşa yoxlamağınız xahiş olunur."
-3. Həmişə çox nəzakətli, peşəkar ol və cavabları mütləq Azərbaycan dilində yaz.
-4. Özünü heç vaxt Gemini, Google və ya başqa bir AI adlandırma. Sən UNEC-in rəsmi rəqəmsal kitabxanaçısan.
+Sənin Vəzifən:
+1. Yuxarıdakı canlı sayt məlumatını oxu. Əgər daxildə həqiqətən kitab(lar) tapılıbsa, həmin kitabların adını, müəllifini, yerləşdiyi korpusu/filialı, rəf və otaq nömrələrini çox səliqəli, qalın şriftlərlə və emojilərlə tələbəyə təqdim et.
+2. Əgər yuxarıdakı mətndə heç bir kitab nəticəsi yoxdursa (və ya mətn çox boşdursa), öz daxili super intellektindən istifadə edərək tələbəyə "{corrected_term}" mövzusunda oxuna biləcək 2-3 dənə dünyaca məşhur əla kitab tövsiyə et. Lakin yerini bilmədiyin üçün əsla rəf nömrəsi uydurma! Və nəzakətlə qeyd et ki, bu mövzu üzrə rəsmi kataloqda dəqiq rəf tapılmadı, lakin bu kitabları oxuya bilərlər.
+3. Həmişə çox peşəkar ol, cavabları mütləq Azərbaycan dilində yaz və özünü heç vaxt Gemini adlandırma. Sən UNEC-in rəsmi ağıllı köməkçisisən.
 """
 
     response = client.models.generate_content(
         model="models/gemini-3.5-flash",
-        contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin sualı:\n{question}",
+        contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin ilkin sualı:\n{question}",
     )
     return response.text
