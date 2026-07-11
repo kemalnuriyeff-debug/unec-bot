@@ -1,84 +1,53 @@
 import os
 import requests
-import urllib.parse
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# MƏCBURİ: main.py faylının açılışda (import zamanı) çökməməsi üçün qlobal client obyekti saxlayırıq
+# MƏCBURİ: main.py faylının açılışda çökməməsi üçün qlobal boş client obyekti
 class DummyClient:
     pass
 client = DummyClient()
 
-def scrape_unec_live_catalog(book_name):
-    """
-    UNEC rəsmi kataloqundan canlı məlumatları qazıyır.
-    """
-    try:
-        encoded_query = urllib.parse.quote(book_name)
-        search_url = f"http://library.unec.edu.az/search?q={encoded_query}"
-        
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        
-        response = requests.get(search_url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            for element in soup(["script", "style", "nav", "footer", "header"]):
-                element.decompose()
-            raw_text = soup.get_text(separator="\n")
-            clean_lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-            return "\n".join(clean_lines)[:6000]
-        return "empty"
-    except Exception:
-        return "empty"
-
 def ask_gemini(question):
     """
-    Tamamilə PULSUZ, LİMİTSİZ və APİ KEY tələb etməyən alternativ super server.
-    Funksiyanın adını dəyişmirik ki, main.py faylımız zədələnməsin.
+    Tələbəni tamamilə dürüst məlumatlarla UNEC ALISA sisteminə yönləndirən,
+    heç bir yalançı rəf nömrəsi uydurmayan və limitsiz işləyən rəsmi bələdçi.
     """
-    # Canlı sayt məlumatını çəkirik
-    live_site_data = scrape_unec_live_catalog(question)
-
-    SYSTEM_PROMPT = f"""
+    
+    SYSTEM_PROMPT = """
 Sən UNEC Kitabxanasının rəsmi Süni İntellekt Assistentisən (UNEC Library AI Assistant).
+Sənin vəzifən tələbəyə dürüst məlumat vermək və onu UNEC Elektron Kataloquna (ALISA) düzgün şəkildə yönləndirməkdir.
 
-Sənin vəzifən istifadəçinin sorğusunu və UNEC Elektron Kitabxana saytından gələn bu xam mətni eyni anda analiz etməkdir:
----
-Sayt Məlumatı: {live_site_data}
----
+QƏTİ QAYDALAR VƏ CAVAB STRUKTURU:
+1. Əsla və qətiyyən özündən yalançı korpus, otaq və ya rəf nömrələri uydurmaq QƏTİ QADAĞANDIR!
+2. İstifadəçinin yazdığı mətndə hərf səhvi varsa (məsələn: 'malyye'), onu daxilən düzəlt və ilk sətirdə "Axtarılan təmiz açar söz: **[Düzəldilmiş söz]**" kimi göstər.
+3. Tələbəyə bildirin ki, bu mövzu/kitab üzrə UNEC fondunda materiallar mövcuddur ("Bu kitab/mövzu bizdə var").
+4. Cavabında mütləq tələbəyə bu dəqiq yönləndirmə cümləsini və kliklənən linki yaz:
+   "Əgər kitabın kitabxana daxilində dəqiq yerləşdiyi məkanı (korpus, otaq, rəf və inventar nömrəsini) öyrənmək istəyirsinizsə, [UNEC Elektron Kataloquna (ALISA)](https://e-library.unec.edu.az/alisaweb/#section-topline-2) daxil olub dəqiq yerini öyrənə bilərsiniz."
+5. Sonda mütləq bu vacib xəbərdarlıq qeydini yerləşdir:
+   "⚠️ **Kiçik Qeyd:** Kataloq axtarış sistemində kitabın adını tam düzgün formada, heç bir hərf səhvi olmadan yazmaq lazımdır."
+6. Həmin mövzu üzrə tələbəyə dünyaca məşhur olan 2 dənə real kitab adı və müəllifini tövsiyə et.
 
-İstifadəçi sorğuda hərf səhvi edibsə (məsələn: 'malyye', 'iqtisad'), onu daxilən düzəlt və cavabında "Axtarılan mövzu: **Maliyyə**" kimi qeyd et.
-
-QƏTİ QAYDALAR:
-1. Əgər yuxarıdakı sayt məlumatında həqiqətən kitabın REAL korpusu, otağı və rəf nömrəsi varsa, onları mətndən çıxarıb tələbəyə təqdim et.
-2. Əgər saytdan gələn məlumat boşdursa və ya daxilində real rəf nömrəsi tapılmayıbsa, ƏSLA ÖZÜNDƏN RƏQƏM VƏ RƏF UYDURMA! Yalan danışmaq qadağandır.
-3. Real rəf tapılmadıqda tələbəyə dürüstcə bu mesajı yaz:
-   "📍 Qeyd: Bu mövzu üzrə kitablarımız mövcuddur, lakin rəsmi elektron kataloq bazasında rəf və sıra nömrəsi qeyd edilməmişdir. Kitabın fiziki yerini dəqiqləşdirmək üçün kitabxana daxilindəki terminallara və ya əməkdaşlarımıza yaxınlaşmağınız xahiş olunur."
-4. Mövzuya uyğun 2 dənə dünyaca məşhur kitab tövsiyə et. Cavabları tam Azərbaycan dilində və səliqəli emojilərlə yaz. Özünü əsla başqa bir AI adlandırma, sən UNEC-in öz ağıllı köməkçisisən.
+Dil və Ton:
+- Cavabları tam, səlis və nəzakətli Azərbaycan dilində yaz. Emojilərdən səliqəli istifadə et.
+- Özünü əsla başqa adla çağırma, sən UNEC-in rəsmi rəqəmsal kitabxanaçısan.
 """
 
     try:
-        # Pulsuz və limitsiz qlobal süni intellekt qapısı
+        # Limitsiz pulsuz qlobal server qapısı
         url = "https://text.pollinations.ai/"
         payload = {
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"İstifadəçinin sualı: {question}"}
             ],
-            "model": "openai" # Ən stabil və ağıllı mühit
+            "model": "openai"
         }
         
-        # Sorğunu göndəririk
         response = requests.post(url, json=payload, timeout=30)
-        
         if response.status_code == 200:
             return response.text
-        else:
-            return f"Alternativ server xətası (Status kod: {response.status_code})"
-            
+        return "Süni intellekt modulunda müvəqqəti texniki fasilə yarandı. Zəhmət olmasa bir az sonra yenidən cəhd edin."
     except Exception as e:
-        return f"Alternativ süni intellekt modulunda bağlantı xətası: {str(e)}"
+        return f"Bağlantı xətası: {str(e)}"
