@@ -7,21 +7,12 @@ from google import genai
 
 load_dotenv()
 
-# Gemini Müştərisini başladırıq
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+# Aktiv açarları sistemdən oxuyuruq
+key1 = os.getenv("GEMINI_API_KEY_1") or os.getenv("GEMINI_API_KEY")
+key2 = os.getenv("GEMINI_API_KEY_2")
 
-def get_corrected_search_term(user_query):
-    """
-    Mərhələ 1: Tələbənin yazdığı mətndən hərfimport os
-import requests
-import urllib.parse
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
-from google import genai
-
-load_dotenv()
+# MƏCBURİ: main.py faylının açılışda çökməməsi üçün qlobal client obyektini yaradırıq
+client = genai.Client(api_key=key1 if key1 else "dummy_key")
 
 def scrape_unec_live_catalog(book_name):
     """
@@ -69,27 +60,22 @@ QƏTİ QAYDALAR:
 4. Mövzuya uyğun 2 dənə dünyaca məşhur kitab tövsiyə et. Cavabları tam Azərbaycan dilində və səliqəli emojilərlə yaz. Özünü əsla Gemini adlandırma.
 """
 
-    # Sistemdəki pulsuz açarları növbə ilə yoxlayırıq (Biri bloklansa, o biri işə düşəcək)
-    keys_to_try = [os.getenv("GEMINI_API_KEY_1"), os.getenv("GEMINI_API_KEY_2")]
+    keys_to_try = [key1, key2]
+    last_error = "Açarlar təyin edilməyib"
     
-    # Əgər köhnə dəyişən hələ də qalıbsa, onu da ehtiyat kimi siyahıya əlavə edirik
-    if os.getenv("GEMINI_API_KEY"):
-        keys_to_try.insert(0, os.getenv("GEMINI_API_KEY"))
-
-    last_error = None
     for key in keys_to_try:
         if not key:
             continue
         try:
-            # Hər açar üçün yeni müştəri başladırıq
-            client = genai.Client(api_key=key)
-            response = client.models.generate_content(
+            # Hər cəhddə aktiv açarla sorğu göndəririk
+            active_client = genai.Client(api_key=key)
+            response = active_client.models.generate_content(
                 model="gemini-3.5-flash",
                 contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin sualı: {question}",
             )
-            return response.text # Əgər uğurludursa, cavabı dərhal qaytarırıq
+            return response.text
         except Exception as e:
             last_error = str(e)
-            continue # Əgər bu açar bloklanıbsa (429), dövr davam edir və növbəti açarı yoxlayır
+            continue
             
-    return f"Bütün pulsuz API limitləri tükəndi. Son xəta: {last_error}"
+    return f"Süni intellekt modulunda müvəqqəti bağlantı xətası: {last_error}"
