@@ -36,7 +36,7 @@ def get_corrected_search_term(user_query):
         Cavab olaraq YALNIZ düzəldilmiş təmiz axtarış sözünü qaytar. Heç bir əlavə izah, nöqtə, cümlə və ya emoci yazma!
         """
         response = client.models.generate_content(
-            model="models/gemini-3.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt,
         )
         return response.text.strip()
@@ -77,7 +77,6 @@ def scrape_unec_library(book_name):
 def ask_gemini(question):
     # Öncə istifadəçinin səhvini düzəldirik (Mərhələ 1)
     corrected_term = get_corrected_search_term(question)
-    print(f"Orijinal: {question} -> Düzəldilmiş: {corrected_term}") # Render loqlarında izləmək üçün
     
     # Düzəldilmiş sözlə saytda canlı axtarış edirik (Mərhələ 2)
     live_site_data = scrape_unec_library(corrected_term)
@@ -85,19 +84,19 @@ def ask_gemini(question):
     SYSTEM_PROMPT = f"""
 Sən UNEC Library AI Assistant-san. UNEC tələbələrinə və rəhbərliyinə kitab tapmaqda kömək edirsən.
 
-Biz istifadəçinin yazdığı mətni düzəldib "{corrected_term}" olaraq UNEC Elektron Kitabxanasında canlı axtardıq. Saytdan gələn CANLI NƏTİCƏLƏR:
+Biz istifadəçinin yazdığı mətndəki açar sözü tapıb "{corrected_term}" olaraq UNEC Elektron Kitabxanasında canlı axtardıq. Saytdan gələn CANLI NƏTİCƏLƏR:
 ---
 {live_site_data}
 ---
 
 Sənin Vəzifən:
 1. Yuxarıdakı canlı sayt məlumatını oxu. Əgər daxildə həqiqətən kitab(lar) tapılıbsa, həmin kitabların adını, müəllifini, yerləşdiyi korpusu/filialı, rəf və otaq nömrələrini çox səliqəli, qalın şriftlərlə və emojilərlə tələbəyə təqdim et.
-2. Əgər yuxarıdakı mətndə heç bir kitab nəticəsi yoxdursa (və ya mətn çox boşdursa), öz daxili super intellektindən istifadə edərək tələbəyə "{corrected_term}" mövzusunda oxuna biləcək 2-3 dənə dünyaca məşhur əla kitab tövsiyə et. Lakin yerini bilmədiyin üçün əsla rəf nömrəsi uydurma! Və nəzakətlə qeyd et ki, bu mövzu üzrə rəsmi kataloqda dəqiq rəf tapılmadı, lakin bu kitabları oxuya bilərlər.
+2. Əgər yuxarıdakı mətndə heç bir kitab nəticəsi yoxdursa (və ya mətn çox boşdursa və ya "empty" yazılıbsa), öz daxili super intellektindən istifadə edərək tələbəyə "{corrected_term}" mövzusunda oxuna biləcək 2-3 dənə dünyaca məşhur əla kitab tövsiyə et. Lakin yerini bilmədiyin üçün əsla rəf nömrəsi uydurma! Və nəzakətlə qeyd et ki, bu mövzu üzrə rəsmi kataloqda dəqiq rəf tapılmadı, lakin bu kitabları oxuya bilərlər.
 3. Həmişə çox peşəkar ol, cavabları mütləq Azərbaycan dilində yaz və özünü heç vaxt Gemini adlandırma. Sən UNEC-in rəsmi ağıllı köməkçisisən.
 """
 
     response = client.models.generate_content(
-        model="models/gemini-3.5-flash",
+        model="gemini-1.5-flash",
         contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin ilkin sualı:\n{question}",
     )
     return response.text
