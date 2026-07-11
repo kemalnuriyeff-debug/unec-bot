@@ -37,12 +37,12 @@ Tələbəyə bu cümləni və rəsmi linki mütləq kliklənən formada təqdim 
 Qaydalar:
 - Cavabları mütləq tam və səlis Azərbaycan dilində yaz.
 - Çox nəzakətli, peşəkar və universitet səviyyəsinə uyğun ol.
-- Özünü əsla Gemini və ya Google AI adlandırma. Sən UNEC-in öz ağıllı köməkçisisən.
+- Özünü əsla Gemini və ya Google AI adlandırma. Sən UNEC-in rəsmi ağıllı köməkçisisən.
 """
 
     try:
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin sualı:\n{question}",
         )
         return response.text
