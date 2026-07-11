@@ -7,12 +7,11 @@ from google import genai
 
 load_dotenv()
 
-# Aktiv açarları sistemdən oxuyuruq
-key1 = os.getenv("GEMINI_API_KEY_1") or os.getenv("GEMINI_API_KEY")
-key2 = os.getenv("GEMINI_API_KEY_2")
+# Əsas API açarını sistemdən oxuyuruq
+api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY_1")
 
-# MƏCBURİ: main.py faylının açılışda çökməməsi üçün qlobal client obyektini yaradırıq
-client = genai.Client(api_key=key1 if key1 else "dummy_key")
+# MƏCBURİ: main.py faylının açılışda çökməməsi üçün qlobal client obyekti
+client = genai.Client(api_key=api_key if api_key else "dummy_key")
 
 def scrape_unec_live_catalog(book_name):
     """
@@ -60,22 +59,21 @@ QƏTİ QAYDALAR:
 4. Mövzuya uyğun 2 dənə dünyaca məşhur kitab tövsiyə et. Cavabları tam Azərbaycan dilində və səliqəli emojilərlə yaz. Özünü əsla Gemini adlandırma.
 """
 
-    keys_to_try = [key1, key2]
-    last_error = "Açarlar təyin edilməyib"
-    
-    for key in keys_to_try:
-        if not key:
-            continue
+    # MODEL HOVUZU: Birində limit (429) bitən kimi, dərhal digərinə keçəcək!
+    models_to_try = ["gemini-3.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    last_error = "Heç bir model cavab vermədi"
+
+    for model_name in models_to_try:
         try:
-            # Hər cəhddə aktiv açarla sorğu göndəririk
-            active_client = genai.Client(api_key=key)
+            # Hər dövrdə ehtiyat modeli işə salmağa çalışırıq
+            active_client = genai.Client(api_key=api_key)
             response = active_client.models.generate_content(
-                model="gemini-3.5-flash",
+                model=model_name,
                 contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin sualı: {question}",
             )
-            return response.text
+            return response.text # Əgər uğurludursa, dərhal cavabı bota qaytarır
         except Exception as e:
             last_error = str(e)
-            continue
+            continue # Əgər 429 xətası alsaq, dayanmır, növbəti ehtiyat modelə keçir
             
     return f"Süni intellekt modulunda müvəqqəti bağlantı xətası: {last_error}"
