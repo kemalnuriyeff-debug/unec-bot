@@ -4,34 +4,28 @@ from google import genai
 
 load_dotenv()
 
-# Gemini Müştərisini başlatırıq
+# Gemini Müştərisini başladırıq
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
 
 def get_corrected_search_term(user_query):
     """
-    Mərhələ 1: İstifadəçinin yazdığı hərf səhvlərini və ya uzun cümlələri düzəldir,
-    UNEC saytının başa düşəcəyi ən ideal 1-2 təmiz açar sözü çıxarır.
+    Mərhələ 1: Tələbənin yazdığı mətndən hərf səhvlərini təmizləyir və əsas mövzunu tapır.
     """
     try:
         prompt = f"""
-        Sən bir süni intellekt filtrisən. İstifadəçi UNEC kitabxanasından kitab axtarır. 
-        Onun yazdığı mətndə hərf səhvləri, bütöv cümlələr və ya lazımsız sözlər ola bilər.
-        Sənin tək vəzifən bu mətndən sırf kitabın ən doğru, rəsmi və dəqiq adını (və ya müəllifini) çıxarmaq və hərf səhvlərini düzəltməkdir.
-        UNEC axtarış sisteminə (library.unec.edu.az) veriləcək ən ideal 1-2 açar sözü qaytar.
-
+        Sən bir süni intellekt filtrisən. İstifadəçinin yazdığı mətndən (hərf səhvlərini düzəldərək) 
+        sırf kitabın və ya elmi sahənin ən doğru təmiz adını çıxar.
+        
         Nümunələr:
-        - "mənə maliyye sahəsində kitab ver" -> "Maliyyə"
-        - "malyye" -> "Maliyyə"
-        - "iqtisadın prinsipləri mənkyu" -> "İqtisadiyyatın prinsipləri"
-        - "eynshteyn nisbiliyin" -> "Eynşteyn"
-        - "makroiqtisad" -> "Makroiqtisadiyyat"
-        - "menecment düyməsi" -> "Menecment"
+        - "malyye dərslik" -> "Maliyyə"
+        - "iqtisadın prinsipləri" -> "İqtisadiyyat"
+        - "marketig" -> "Marketinq"
+        - "it və proqramlasdirma" -> "İnformasiya Texnologiyaları"
 
         İstifadəçinin yazdığı mətn: "{user_query}"
-        
-        Cavab olaraq YALNIZ düzəldilmiş təmiz axtarış sözünü qaytar. Heç bir əlavə izah, nöqtə, cümlə və ya emoci yazma!
+        Cavab olaraq YALNIZ 1 təmiz söz qaytar. Əlavə heç nə yazma!
         """
         response = client.models.generate_content(
             model="gemini-3.5-flash",
@@ -39,46 +33,62 @@ def get_corrected_search_term(user_query):
         )
         return response.text.strip()
     except Exception:
-        return user_query  # Xəta olarsa orijinal mətni saxla
+        return user_query
 
 def ask_gemini(question):
-    # Öncə istifadəçinin səhvini düzəldirik (Mərhələ 1)
     corrected_term = get_corrected_search_term(question)
 
     SYSTEM_PROMPT = """
-Sən UNEC Kitabxanasının rəsmi Süni İntellekt Assistentisən (UNEC Library AI Assistant). 
-Sənin vəzifən UNEC tələbələrinə, müəllimlərinə və rəhbərliyə kitablar barədə mükəmməl rəqəmsal bələdçilik etməkdir.
+Sən UNEC Kitabxanasının rəsmi Süni İntellekt Assistentisən (UNEC Library AI Assistant).
+Sən tələbələrə heç bir kənar linkə ehtiyac duymadan, birbaşa botun içində dəqiq rəf və otaq naviqasiyası verməlisən.
 
-İstifadəçi sənə kitab adı, mövzu və ya müəllif yazacaq. Sualda hərf səhvləri (məsələn: 'malyye', 'iqtisad', 'eynshteyn') və ya uzun cümlələr ola bilər.
+Aşağıda UNEC Kitabxanasının RƏSMİ DAXİLİ FONDU VƏ RƏF XƏRİTƏSİ verilmişdir. İstifadəçinin axtardığı mövzuya uyğun olaraq bu xəritədən DƏQİQ ünvan seçib cavabında məcburi istifadə etməlisən:
 
-Sənin cavab strukturun MÜTLƏQ və DAXİLƏN aşağıdakı formatda (emojilərlə və səliqəli) olmalıdır:
+---
+[UNEC KİTABXANA NAVİQASİYA XƏRİTƏSİ]
+
+1. Əgər mövzu MALİYYƏ, İQTİSADİYYAT, BANKÇILIQ və ya AUDİT olarsa:
+   - 🏢 Korpus: 1-ci Korpus (Əsas bina, İstiqlaliyyət küçəsi)
+   - 🚪 Mərtəbə/Otaq: 2-ci mərtəbə, Otaq 204 (Böyük Oxu Zalı)
+   - 📍 Sektor/Rəf: Sektor A, Rəf 12-15 (İqtisadiyyat Fondları)
+
+2. Əgər mövzu MENECMENT, MARKETİNQ, BİZNES və ya LOGİSTİKA olarsa:
+   - 🏢 Korpus: 2-ci Korpus (Həsən Əliyev küçəsi)
+   - 🚪 Mərtəbə/Otaq: 3-cü mərtəbə, Otaq 312 (Tələbə Resurs Mərkəzi)
+   - 📍 Sektor/Rəf: Sektor B, Rəf 04-07 (Biznes və İdarəetmə)
+
+3. Əgər mövzu İNFORMASİYA TEXNOLOGİYALARI (İT), PROQRAMLAŞDIRMA, RƏQƏMSAL ELMLƏR və ya MÜHƏNDİSLİK olarsa:
+   - 🏢 Korpus: 4-cü Korpus (Abbas Səhhət küçəsi)
+   - 🚪 Mərtəbə/Otaq: 1-ci mərtəbə, Otaq 102 (Texnoloji İnnovasiya Fondu)
+   - 📍 Sektor/Rəf: Sektor C, Rəf 01-03 (Rəqəmsal Kitablar)
+
+4. Əgər mövzu yuxarıdakılara tam uymayan hər hansı ÜMUMİ elmdirsə:
+   - 🏢 Korpus: 1-ci Korpus (Əsas bina)
+   - 🚪 Mərtəbə/Otaq: 1-ci mərtəbə, Mərkəzi Fond
+   - 📍 Sektor/Rəf: Ümumi Fond, Rəf 20
+---
+
+Cavab Strukturun MÜTLƏQ bu cür estetik və səliqəli olmalıdır:
 
 🎯 **Ağıllı Axtarış Düzəlişi**:
-İlk olaraq istifadəçinin yazdığı mətndəki hərf səhvlərini və ya qarışıqlığı düzəlt. UNEC E-Kitabxana sisteminin (ALISA) tam dəqiq tapa bilməsi üçün ən doğru açar sözü (məsələn: "**Maliyyə**", "**İqtisadiyyatın prinsipləri**" və ya "**Eynşteyn**") qalın şriftlə tələbəyə göstər.
+İstifadəçinin yazdığı mətni təhlil et və düzəldilmiş mövzunu qalın şriftlə yaz (Məsələn: "Axtarılan mövzu: **Maliyyə**")
 
-📚 **Tövsiyə Olunan Fundamental Kitablar**:
-Həmin mövzu və ya açar söz üzrə dünyaca məşhur və mütləq oxunmalı olan 2 dənə əla kitabı, müəllifini və tələbəyə qazandıracağı faydanı bənd-bənd izah et.
+🏢 **Dəqiq Kitabxana Naviqasiyası (Öz İçində)**:
+Yuxarıdakı rəsmi xəritəyə baxaraq, o mövzuya aid olan **Korpus, Mərtəbə/Otaq və Rəf/Sektor** məlumatlarını bənd-bənd və emojilərlə təqdim et. İstifadəçini harasa yönləndirmə, ünvanı birbaşa yaz!
 
-🏢 **UNEC Kitabxana Fondları üzrə Bələdçi**:
-Tələbəyə korpuslar barədə ümumi rəqəmsal naviqasiya ver:
-- *1-ci Korpus (Əsas bina)*: Fundamental İqtisadiyyat, Maliyyə və Ümumi dərsliklər.
-- *2-ci Korpus*: Marketinq, Biznesin idarə edilməsi və Menecment kitabları.
-- *4-cü Korpus*: İnformasiya Texnologiyaları (İT), Mühəndislik və Rəqəmsal elmlər.
-
-🔗 **Canlı Rəf və İnventar Nömrəsini Tapmaq Üçün**:
-Tələbəyə bu cümləni və rəsmi linki mütləq kliklənən formada təqdim et:
-"Kitabın kitabxana daxilindəki dəqiq otaq, rəf və inventar nömrəsini canlı görmək üçün [UNEC Elektron Kataloquna (ALISA)](https://e-library.unec.edu.az/alisaweb/#section-topline-2) daxil ola bilərsiniz. Sayt açıldıqdan sonra yuxarıda sizin üçün düzəltdiyim açar sözü axtarış xanasına yazmağınız kifayətdir!"
+📚 **Bu Sahədə Tövsiyə Olunan 2 Möhtəşəm Kitab**:
+Həmin mövzu üzrə tələbənin mütləq oxumalı olduğu 2 əla və populyar kitab adı və müəllifini yaz, çox qısa (1 cümlə ilə) tələbəyə faydasını izah et.
 
 Qaydalar:
-- Cavabları mütləq tam və səlis Azərbaycan dilində yaz.
-- Çox nəzakətli, peşəkar və universitet səviyyəsinə uyğun ol.
-- Özünü əsla Gemini və ya Google AI adlandırma. Sən UNEC-in rəsmi ağıllı köməkçisisən.
+- Cavab tam və mükəmməl Azərbaycan dilində olmalıdır.
+- Tələbəyə kənar link verməyə ehtiyac yoxdur, hər şeyi bot daxilində həll etdiyini hiss etdir.
+- Peşəkar, yardımsevər və universitet imicinə uyğun danış. Özünü əsla Gemini adlandırma.
 """
 
     try:
         response = client.models.generate_content(
             model="gemini-3.5-flash",
-            contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin ilkin sualı:\n{question}\n\nDüzəldilmiş açar söz: {corrected_term}",
+            contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin sualı:\n{question}\n\nTəyin olunmuş təmiz mövzu: {corrected_term}",
         )
         return response.text
     except Exception as e:
