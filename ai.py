@@ -4,12 +4,47 @@ from google import genai
 
 load_dotenv()
 
-# Gemini Müştərisini başladırıq
+# Gemini Müştərisini başlatırıq
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
 
+def get_corrected_search_term(user_query):
+    """
+    Mərhələ 1: İstifadəçinin yazdığı hərf səhvlərini və ya uzun cümlələri düzəldir,
+    UNEC saytının başa düşəcəyi ən ideal 1-2 təmiz açar sözü çıxarır.
+    """
+    try:
+        prompt = f"""
+        Sən bir süni intellekt filtrisən. İstifadəçi UNEC kitabxanasından kitab axtarır. 
+        Onun yazdığı mətndə hərf səhvləri, bütöv cümlələr və ya lazımsız sözlər ola bilər.
+        Sənin tək vəzifən bu mətndən sırf kitabın ən doğru, rəsmi və dəqiq adını (və ya müəllifini) çıxarmaq və hərf səhvlərini düzəltməkdir.
+        UNEC axtarış sisteminə (library.unec.edu.az) veriləcək ən ideal 1-2 açar sözü qaytar.
+
+        Nümunələr:
+        - "mənə maliyye sahəsində kitab ver" -> "Maliyyə"
+        - "malyye" -> "Maliyyə"
+        - "iqtisadın prinsipləri mənkyu" -> "İqtisadiyyatın prinsipləri"
+        - "eynshteyn nisbiliyin" -> "Eynşteyn"
+        - "makroiqtisad" -> "Makroiqtisadiyyat"
+        - "menecment düyməsi" -> "Menecment"
+
+        İstifadəçinin yazdığı mətn: "{user_query}"
+        
+        Cavab olaraq YALNIZ düzəldilmiş təmiz axtarış sözünü qaytar. Heç bir əlavə izah, nöqtə, cümlə və ya emoci yazma!
+        """
+        response = client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=prompt,
+        )
+        return response.text.strip()
+    except Exception:
+        return user_query  # Xəta olarsa orijinal mətni saxla
+
 def ask_gemini(question):
+    # Öncə istifadəçinin səhvini düzəldirik (Mərhələ 1)
+    corrected_term = get_corrected_search_term(question)
+
     SYSTEM_PROMPT = """
 Sən UNEC Kitabxanasının rəsmi Süni İntellekt Assistentisən (UNEC Library AI Assistant). 
 Sənin vəzifən UNEC tələbələrinə, müəllimlərinə və rəhbərliyə kitablar barədə mükəmməl rəqəmsal bələdçilik etməkdir.
@@ -42,8 +77,8 @@ Qaydalar:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin sualı:\n{question}",
+            model="gemini-3.5-flash",
+            contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin ilkin sualı:\n{question}\n\nDüzəldilmiş açar söz: {corrected_term}",
         )
         return response.text
     except Exception as e:
