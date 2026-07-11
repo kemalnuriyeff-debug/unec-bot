@@ -3,15 +3,13 @@ import requests
 import urllib.parse
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from google import genai
 
 load_dotenv()
 
-# Əsas API açarını sistemdən oxuyuruq
-api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY_1")
-
-# MƏCBURİ: main.py faylının açılışda çökməməsi üçün qlobal client obyekti
-client = genai.Client(api_key=api_key if api_key else "dummy_key")
+# MƏCBURİ: main.py faylının açılışda (import zamanı) çökməməsi üçün qlobal client obyekti saxlayırıq
+class DummyClient:
+    pass
+client = DummyClient()
 
 def scrape_unec_live_catalog(book_name):
     """
@@ -38,6 +36,10 @@ def scrape_unec_live_catalog(book_name):
         return "empty"
 
 def ask_gemini(question):
+    """
+    Tamamilə PULSUZ, LİMİTSİZ və APİ KEY tələb etməyən alternativ super server.
+    Funksiyanın adını dəyişmirik ki, main.py faylımız zədələnməsin.
+    """
     # Canlı sayt məlumatını çəkirik
     live_site_data = scrape_unec_live_catalog(question)
 
@@ -53,27 +55,30 @@ Sayt Məlumatı: {live_site_data}
 
 QƏTİ QAYDALAR:
 1. Əgər yuxarıdakı sayt məlumatında həqiqətən kitabın REAL korpusu, otağı və rəf nömrəsi varsa, onları mətndən çıxarıb tələbəyə təqdim et.
-2. Əgər saytdan gələn məlumat boşdursa və ya daxilində real rəf nömrəsi tapılmayıbsa, ƏSLA ÖZÜNDƏN RƏQƏM VƏ RƏF UYDURMA!
+2. Əgər saytdan gələn məlumat boşdursa və ya daxilində real rəf nömrəsi tapılmayıbsa, ƏSLA ÖZÜNDƏN RƏQƏM VƏ RƏF UYDURMA! Yalan danışmaq qadağandır.
 3. Real rəf tapılmadıqda tələbəyə dürüstcə bu mesajı yaz:
    "📍 Qeyd: Bu mövzu üzrə kitablarımız mövcuddur, lakin rəsmi elektron kataloq bazasında rəf və sıra nömrəsi qeyd edilməmişdir. Kitabın fiziki yerini dəqiqləşdirmək üçün kitabxana daxilindəki terminallara və ya əməkdaşlarımıza yaxınlaşmağınız xahiş olunur."
-4. Mövzuya uyğun 2 dənə dünyaca məşhur kitab tövsiyə et. Cavabları tam Azərbaycan dilində və səliqəli emojilərlə yaz. Özünü əsla Gemini adlandırma.
+4. Mövzuya uyğun 2 dənə dünyaca məşhur kitab tövsiyə et. Cavabları tam Azərbaycan dilində və səliqəli emojilərlə yaz. Özünü əsla başqa bir AI adlandırma, sən UNEC-in öz ağıllı köməkçisisən.
 """
 
-    # MODEL HOVUZU: Birində limit (429) bitən kimi, dərhal digərinə keçəcək!
-    models_to_try = ["gemini-3.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-    last_error = "Heç bir model cavab vermədi"
-
-    for model_name in models_to_try:
-        try:
-            # Hər dövrdə ehtiyat modeli işə salmağa çalışırıq
-            active_client = genai.Client(api_key=api_key)
-            response = active_client.models.generate_content(
-                model=model_name,
-                contents=f"{SYSTEM_PROMPT}\n\nİstifadəçinin sualı: {question}",
-            )
-            return response.text # Əgər uğurludursa, dərhal cavabı bota qaytarır
-        except Exception as e:
-            last_error = str(e)
-            continue # Əgər 429 xətası alsaq, dayanmır, növbəti ehtiyat modelə keçir
+    try:
+        # Pulsuz və limitsiz qlobal süni intellekt qapısı
+        url = "https://text.pollinations.ai/"
+        payload = {
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"İstifadəçinin sualı: {question}"}
+            ],
+            "model": "openai" # Ən stabil və ağıllı mühit
+        }
+        
+        # Sorğunu göndəririk
+        response = requests.post(url, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            return response.text
+        else:
+            return f"Alternativ server xətası (Status kod: {response.status_code})"
             
-    return f"Süni intellekt modulunda müvəqqəti bağlantı xətası: {last_error}"
+    except Exception as e:
+        return f"Alternativ süni intellekt modulunda bağlantı xətası: {str(e)}"
