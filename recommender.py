@@ -1,0 +1,2 @@
+def recommend(topic):
+    return []
